@@ -41,8 +41,8 @@ jobs:
           port: 22
           script: |
             docker pull ${{ secrets.DOCKER_USERNAME }}/cryptic-blockchain-interaction-service:latest
-            docker stop my-node-app || true
-            docker rm my-node-app || true
+            docker stop cryptic-blockchain-interaction-service || true
+            docker rm cryptic-blockchain-interaction-service || true
             docker run -d --name cryptic-blockchain-interaction-service -p 80:3000 \
 
-              ${{ secrets.DOCKER_USERNAME }}/my-node-app:latest
+              ${{ secrets.DOCKER_USERNAME }}/cryptic-blockchain-interaction-service:latest
