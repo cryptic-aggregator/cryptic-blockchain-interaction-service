@@ -30,7 +30,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/cryptic-blockchain-interaction-service:latest
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.4
@@ -40,9 +40,9 @@ jobs:
           password: ${{ secrets.SERVER_SSH_PASSWORD }}
           port: 22
           script: |
-            docker pull ${{ secrets.DOCKER_USERNAME }}/my-node-app:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/cryptic-blockchain-interaction-service:latest
             docker stop my-node-app || true
             docker rm my-node-app || true
-            docker run -d --name my-node-app -p 80:3000 \
+            docker run -d --name cryptic-blockchain-interaction-service -p 80:3000 \
 
               ${{ secrets.DOCKER_USERNAME }}/my-node-app:latest
