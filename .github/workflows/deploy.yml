@@ -37,7 +37,7 @@ jobs:
         with:
           host: 20.215.241.137
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          key: ${{ secrets.SERVER_SSH_PASSWORD }}
           port: 22
           script: |
             docker pull ${{ secrets.DOCKER_USERNAME }}/my-node-app:latest
