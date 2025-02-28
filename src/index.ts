@@ -9,7 +9,7 @@ const server = new grpc.Server();
 server.addService(proto.WalletService.service, walletService);
 
 function main(): void {
-  const bindAddress = '0.0.0.0:4001';
+  const bindAddress = '20.215.241.137:4001';
   server.bindAsync(bindAddress, grpc.ServerCredentials.createInsecure(), (err, port) => {
     if (err) {
       console.error(`Error binding server: ${err.message}`);
