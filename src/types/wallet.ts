@@ -1,5 +1,5 @@
 export interface GetWalletCoinsRequest {
-  addresses: string[];
+  address: string[];
 }
 
 export interface Coin {
