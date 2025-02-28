@@ -1,39 +1,47 @@
-import { ethers } from 'ethers';
 import { ServerUnaryCall, sendUnaryData } from '@grpc/grpc-js';
+import axios from 'axios';
 import { GetWalletCoinsRequest, GetWalletCoinsResponse, Coin } from '../types/wallet';
-import { Connection, clusterApiUrl, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
+const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjNmODFhZjY0LWNiZjAtNGRmOC1hNDNiLTJlNzliNzA3MDczNyIsIm9yZ0lkIjoiNDA3NTkwIiwidXNlcklkIjoiNDE4ODIwIiwidHlwZUlkIjoiZDY2MGU1MjYtM2VkZC00ZTUzLTg4NDYtZDVhOTBiYWY2ZWQxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MjU3OTY2MTcsImV4cCI6NDg4MTU1NjYxN30.4tDcTjdtjoY7aEzzwJZIlD_mS6LtTCOY6Zxa5O8k694';
 
-const solanaConnection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+function detectChain(address: string): string {
+  if (address.startsWith('0x') && address.length === 42) {
+    return 'eth';
+  }
+  if (/^(1|3|bc1)/.test(address)) {
+    return 'btc';
+  }
+  return 'sol';
+}
 
-async function getCoinBalances(address: string): Promise<Coin[]> {
+async function getBalancesForAddress(address: string, chain: string): Promise<Coin[]> {
   const coins: Coin[] = [];
 
   try {
-    const publicKey = new PublicKey(address);
-    const solBalanceLamports = await solanaConnection.getBalance(publicKey);
-    const solBalance = solBalanceLamports / LAMPORTS_PER_SOL;
-    coins.push({ symbol: 'SOL', balance: solBalance.toString() });
-  } catch (err) {
-    console.error("Помилка отримання SOL балансу:", err);
-    coins.push({ symbol: 'SOL', balance: 'error' });
+    const nativeRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/balance`, {
+      params: { chain },
+      headers: { 'X-API-Key': MORALIS_API_KEY },
+    });
+    const nativeBalance = nativeRes.data.balance;
+    coins.push({ symbol: chain.toUpperCase(), balance: nativeBalance.toString() });
+  } catch (error) {
+    console.error(`Помилка отримання нативного балансу для ${chain} (${address}):`, error);
+    coins.push({ symbol: chain.toUpperCase(), balance: 'error' });
   }
 
-
   try {
-    const btcResponse = await fetch(`https://blockstream.info/api/address/${address}`);
-    if (!btcResponse.ok) {
-      throw new Error(`BTC API відповідає з помилкою: ${btcResponse.statusText}`);
-    }
-    const btcData = await btcResponse.json();
-    const funded = btcData.chain_stats.funded_txo_sum;
-    const spent = btcData.chain_stats.spent_txo_sum;
-    const btcBalanceSatoshis = funded - spent;
-    const btcBalance = btcBalanceSatoshis / 1e8;
-    coins.push({ symbol: 'BTC', balance: btcBalance.toString() });
-  } catch (err) {
-    console.error("Помилка отримання BTC балансу:", err);
-    coins.push({ symbol: 'BTC', balance: 'error' });
+    const tokensRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/erc20`, {
+      params: { chain },
+      headers: { 'X-API-Key': MORALIS_API_KEY },
+    });
+    const tokens = tokensRes.data;
+    tokens.forEach((token: any) => {
+      const decimals = Number(token.decimals) || 1;
+      const balance = parseFloat(token.balance) / Math.pow(10, decimals);
+      coins.push({ symbol: token.symbol, balance: balance.toString() });
+    });
+  } catch (error) {
+    console.error(`Помилка отримання токенів для ${chain} (${address}):`, error);
   }
 
   return coins;
@@ -41,16 +49,24 @@ async function getCoinBalances(address: string): Promise<Coin[]> {
 
 export const walletService = {
   GetWalletCoins: async (
-    call: ServerUnaryCall<GetWalletCoinsRequest, GetWalletCoinsResponse>,
-    callback: sendUnaryData<GetWalletCoinsResponse>
+      call: ServerUnaryCall<GetWalletCoinsRequest, GetWalletCoinsResponse>,
+      callback: sendUnaryData<GetWalletCoinsResponse>
   ): Promise<void> => {
     try {
-      const address = call.request.address;
-      console.log(`Отримано запит для адреси: ${address}`);
+      const addresses: string[] = call.request.addresses;
+      console.log(`Отримано запит для адрес: ${addresses.join(', ')}`);
 
-      // Отримуємо баланси для ETH, SOL та BTC
-      const coins = await getCoinBalances(address);
-      callback(null, { coins });
+      const results = await Promise.all(
+          addresses.map(async (address) => {
+            const chain = detectChain(address);
+            const coins = await getBalancesForAddress(address, chain);
+            return coins;
+          })
+      );
+
+      const allCoins = results.flat();
+
+      callback(null, { coins: allCoins });
     } catch (error) {
       console.error("Помилка у GetWalletCoins:", error);
       callback(error as Error, null);
