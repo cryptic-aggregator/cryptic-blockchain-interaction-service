@@ -6,6 +6,7 @@ import {formatEther} from "ethers";
 const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjNmODFhZjY0LWNiZjAtNGRmOC1hNDNiLTJlNzliNzA3MDczNyIsIm9yZ0lkIjoiNDA3NTkwIiwidXNlcklkIjoiNDE4ODIwIiwidHlwZUlkIjoiZDY2MGU1MjYtM2VkZC00ZTUzLTg4NDYtZDVhOTBiYWY2ZWQxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MjU3OTY2MTcsImV4cCI6NDg4MTU1NjYxN30.4tDcTjdtjoY7aEzzwJZIlD_mS6LtTCOY6Zxa5O8k694';
 const CRYPTOCOMPARE_API_KEY = '2eafccccdf1cc8ebd3a533d8d61736f358d4db2d2f66eab4a732f30b714f5813';
 
+// Мапування символів токенів для CryptoCompare
 const cryptoCompareMapping: { [symbol: string]: string } = {
   'WETH': 'ETH',
   'ETH': 'ETH',
@@ -15,7 +16,6 @@ const cryptoCompareMapping: { [symbol: string]: string } = {
 
 /**
  * Функція отримання поточної ринкової ціни токена з CryptoCompare API.
- * tokenSymbol – символ токена (наприклад, "ETH")
  */
 async function getCurrentPriceCryptoCompare(tokenSymbol: string): Promise<number> {
   const mappedSymbol = cryptoCompareMapping[tokenSymbol];
@@ -41,17 +41,6 @@ async function getCurrentPriceCryptoCompare(tokenSymbol: string): Promise<number
     console.error(`Error fetching current price from CryptoCompare for ${tokenSymbol}:`, error);
     return 0;
   }
-}
-
-/**
- * Форматує дату з ISO у формат "dd-mm-yyyy", як вимагає CoinGecko (можна використати для CryptoCompare, якщо потрібно).
- */
-function formatDateForCoingecko(isoDate: string): string {
-  const date = new Date(isoDate);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
 }
 
 /**
@@ -88,7 +77,7 @@ async function getHistoricalPriceCryptoCompare(tokenSymbol: string, timestamp: n
 }
 
 /**
- * Розрахунок середньої ціни покупки токена за історією транзакцій.
+ * Функція розрахунку середньої ціни покупки токена за історією транзакцій.
  */
 async function getAveragePurchasePrice(address: string, tokenAddress: string, chain: string, tokenSymbol: string): Promise<string> {
   try {
@@ -129,12 +118,16 @@ function detectChain(address: string): string {
 }
 
 /**
- * Функція отримання балансів (нативний та токени) для заданої адреси.
- * Також отримує поточну ринкову ціну для кожного активу та обчислює їх поточну вартість в USDT.
+ * Функція отримання балансів (нативний актив та токени) для заданої адреси.
+ * Окрім цього, для кожного активу отримується поточна ціна та обчислюються:
+ *  - currentValue: поточна вартість (balance * currentMarketPrice)
+ *  - priceChange1hPercent: зміна ціни за останню годину (у відсотках)
+ *  - changeSinceAvgPurchase: зміна поточної ціни відносно середньої ціни покупки (у відсотках)
  */
 async function getBalancesForAddress(address: string, chain: string): Promise<Coin[]> {
   const coins: Coin[] = [];
-  // Обчислюємо нативний баланс
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  // Для нативного активу
   try {
     const nativeRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/balance`, {
       params: { chain },
@@ -146,17 +139,52 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const numericBalance = parseFloat(ethBalance);
       const currentPrice = await getCurrentPriceCryptoCompare('ETH');
       const currentValue = numericBalance * currentPrice;
-      coins.push({ symbol: 'ETH', balance: ethBalance, currentMarketPrice: currentPrice.toString(), currentValue: currentValue.toString() });
+      // Отримуємо ціну 1 годину тому
+      const price1hAgo = await getHistoricalPriceCryptoCompare('ETH', currentTimestamp - 3600);
+      const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
+      // Для нативного активу середня ціна покупки може бути відсутня, встановлюємо 0
+      const changeSinceAvgPurchase = "0";
+      coins.push({
+        symbol: 'ETH',
+        balance: ethBalance,
+        currentMarketPrice: currentPrice.toString(),
+        currentValue: currentValue.toString(),
+        avgPurchasePrice: "0",
+        priceChange1hPercent,
+        changeSinceAvgPurchase
+      });
     } else if (chain === 'btc') {
       const btcBalance = parseFloat(nativeBalance) / 1e8;
       const currentPrice = await getCurrentPriceCryptoCompare('BTC');
       const currentValue = btcBalance * currentPrice;
-      coins.push({ symbol: 'BTC', balance: btcBalance.toString(), currentMarketPrice: currentPrice.toString(), currentValue: currentValue.toString() });
+      const price1hAgo = await getHistoricalPriceCryptoCompare('BTC', currentTimestamp - 3600);
+      const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
+      const changeSinceAvgPurchase = "0";
+      coins.push({
+        symbol: 'BTC',
+        balance: btcBalance.toString(),
+        currentMarketPrice: currentPrice.toString(),
+        currentValue: currentValue.toString(),
+        avgPurchasePrice: "0",
+        priceChange1hPercent,
+        changeSinceAvgPurchase
+      });
     } else if (chain === 'sol') {
       const solBalance = parseFloat(nativeBalance) / 1e9;
       const currentPrice = await getCurrentPriceCryptoCompare('SOL');
       const currentValue = solBalance * currentPrice;
-      coins.push({ symbol: 'SOL', balance: solBalance.toString(), currentMarketPrice: currentPrice.toString(), currentValue: currentValue.toString() });
+      const price1hAgo = await getHistoricalPriceCryptoCompare('SOL', currentTimestamp - 3600);
+      const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
+      const changeSinceAvgPurchase = "0";
+      coins.push({
+        symbol: 'SOL',
+        balance: solBalance.toString(),
+        currentMarketPrice: currentPrice.toString(),
+        currentValue: currentValue.toString(),
+        avgPurchasePrice: "0",
+        priceChange1hPercent,
+        changeSinceAvgPurchase
+      });
     } else {
       coins.push({ symbol: chain.toUpperCase(), balance: nativeBalance.toString() });
     }
@@ -165,7 +193,7 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
     coins.push({ symbol: chain.toUpperCase(), balance: 'error' });
   }
 
-  // Обчислюємо токени
+  // Для токенів
   try {
     const tokensRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/erc20`, {
       params: { chain },
@@ -178,12 +206,17 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const avgPrice = await getAveragePurchasePrice(address, token.token_address, chain, token.symbol);
       const currentPrice = await getCurrentPriceCryptoCompare(token.symbol);
       const currentValue = balance * currentPrice;
+      const price1hAgo = await getHistoricalPriceCryptoCompare(token.symbol, currentTimestamp - 3600);
+      const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
+      const changeSinceAvgPurchase = parseFloat(avgPrice) > 0 ? (((currentPrice - parseFloat(avgPrice)) / parseFloat(avgPrice)) * 100).toString() : "0";
       return {
         symbol: token.symbol,
         balance: balance.toString(),
         avgPurchasePrice: avgPrice,
         currentMarketPrice: currentPrice.toString(),
-        currentValue: currentValue.toString()
+        currentValue: currentValue.toString(),
+        priceChange1hPercent,
+        changeSinceAvgPurchase
       };
     });
     const tokenCoins: Coin[] = await Promise.all(tokenPromises);
@@ -223,4 +256,4 @@ export const walletService = {
       callback(error as Error, null);
     }
   },
-};
+};;

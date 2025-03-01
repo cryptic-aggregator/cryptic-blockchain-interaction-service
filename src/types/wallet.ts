@@ -8,6 +8,8 @@ export interface Coin {
   avgPurchasePrice?: string;
   currentMarketPrice?: string;
   currentValue?: string;
+  priceChange1hPercent? : string,
+  changeSinceAvgPurchase? : string,
 }
 
 export interface GetWalletCoinsResponse {
