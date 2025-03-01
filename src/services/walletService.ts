@@ -2,28 +2,26 @@ import { ServerUnaryCall, sendUnaryData } from '@grpc/grpc-js';
 import axios from 'axios';
 import { GetWalletCoinsRequest, GetWalletCoinsResponse, Coin } from '../types/wallet';
 import {formatEther} from "ethers";
+import {cacheResponse, getCachedResponse} from "../database/redis/redisClient";
+
 
 const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjNmODFhZjY0LWNiZjAtNGRmOC1hNDNiLTJlNzliNzA3MDczNyIsIm9yZ0lkIjoiNDA3NTkwIiwidXNlcklkIjoiNDE4ODIwIiwidHlwZUlkIjoiZDY2MGU1MjYtM2VkZC00ZTUzLTg4NDYtZDVhOTBiYWY2ZWQxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MjU3OTY2MTcsImV4cCI6NDg4MTU1NjYxN30.4tDcTjdtjoY7aEzzwJZIlD_mS6LtTCOY6Zxa5O8k694';
 const CRYPTOCOMPARE_API_KEY = '2eafccccdf1cc8ebd3a533d8d61736f358d4db2d2f66eab4a732f30b714f5813';
 
-// Мапування символів токенів для CryptoCompare
 const cryptoCompareMapping: { [symbol: string]: string } = {
   'WETH': 'ETH',
   'ETH': 'ETH',
   'USDT': 'USDT',
-  // додайте інші відповідності за потребою
+  // ...
 };
 
-// Константне мапування для нативних активів (можна змінити URL за потребою)
+// Константне мапування зображень для нативних активів
 const nativeImageMapping: { [chain: string]: string } = {
   eth: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
   btc: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
   sol: 'https://assets.coingecko.com/coins/images/4128/large/solana.png'
 };
 
-/**
- * Функція отримання поточної ринкової ціни токена з CryptoCompare API.
- */
 async function getCurrentPriceCryptoCompare(tokenSymbol: string): Promise<number> {
   const mappedSymbol = cryptoCompareMapping[tokenSymbol];
   if (!mappedSymbol) {
@@ -32,27 +30,19 @@ async function getCurrentPriceCryptoCompare(tokenSymbol: string): Promise<number
   }
   try {
     const response = await axios.get('https://min-api.cryptocompare.com/data/price', {
-      params: {
-        fsym: mappedSymbol,
-        tsyms: 'USD'
-      },
-      headers: {
-        'authorization': `Apikey ${CRYPTOCOMPARE_API_KEY}`
-      }
+      params: { fsym: mappedSymbol, tsyms: 'USD' },
+      headers: { 'authorization': `Apikey ${CRYPTOCOMPARE_API_KEY}` }
     });
     if (response.data && response.data.USD) {
       return Number(response.data.USD);
     }
     return 0;
   } catch (error) {
-    console.error(`Error fetching current price from CryptoCompare for ${tokenSymbol}:`, error);
+    console.error(`Error fetching current price for ${tokenSymbol}:`, error);
     return 0;
   }
 }
 
-/**
- * Функція отримання історичної ціни токена з CryptoCompare API за добовим інтервалом.
- */
 async function getHistoricalPriceCryptoCompare(tokenSymbol: string, timestamp: number): Promise<number> {
   const mappedSymbol = cryptoCompareMapping[tokenSymbol];
   if (!mappedSymbol) {
@@ -61,15 +51,8 @@ async function getHistoricalPriceCryptoCompare(tokenSymbol: string, timestamp: n
   }
   try {
     const response = await axios.get('https://min-api.cryptocompare.com/data/v2/histoday', {
-      params: {
-        fsym: mappedSymbol,
-        tsym: 'USD',
-        limit: 1,
-        toTs: timestamp, // дані за добу, що закінчується у цей момент
-      },
-      headers: {
-        'authorization': `Apikey ${CRYPTOCOMPARE_API_KEY}`
-      }
+      params: { fsym: mappedSymbol, tsym: 'USD', limit: 1, toTs: timestamp },
+      headers: { 'authorization': `Apikey ${CRYPTOCOMPARE_API_KEY}` }
     });
     if (response.data && response.data.Data && response.data.Data.Data && response.data.Data.Data.length > 0) {
       const dataPoint = response.data.Data.Data[0];
@@ -77,14 +60,11 @@ async function getHistoricalPriceCryptoCompare(tokenSymbol: string, timestamp: n
     }
     return 0;
   } catch (error) {
-    console.error(`Error fetching historical price from CryptoCompare for ${tokenSymbol} at timestamp ${timestamp}:`, error);
+    console.error(`Error fetching historical price for ${tokenSymbol} at timestamp ${timestamp}:`, error);
     return 0;
   }
 }
 
-/**
- * Функція розрахунку середньої ціни покупки токена за історією транзакцій.
- */
 async function getAveragePurchasePrice(address: string, tokenAddress: string, chain: string, tokenSymbol: string): Promise<string> {
   try {
     const transfersRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/erc20/transfers`, {
@@ -114,27 +94,15 @@ async function getAveragePurchasePrice(address: string, tokenAddress: string, ch
 }
 
 function detectChain(address: string): string {
-  if (address.startsWith('0x') && address.length === 42) {
-    return 'eth';
-  }
-  if (/^(1|3|bc1)/.test(address)) {
-    return 'btc';
-  }
+  if (address.startsWith('0x') && address.length === 42) return 'eth';
+  if (/^(1|3|bc1)/.test(address)) return 'btc';
   return 'sol';
 }
 
-/**
- * Функція отримання балансів (нативний актив та токени) для заданої адреси.
- * Для кожного активу отримується поточна ціна, обчислюється його поточна вартість,
- * а також розраховуються:
- *  - priceChange1hPercent: зміна ціни за останню годину (у відсотках)
- *  - changeSinceAvgPurchase: зміна поточної ціни відносно середньої ціни покупки (у відсотках)
- *  - image: посилання на картинку активу
- */
 async function getBalancesForAddress(address: string, chain: string): Promise<Coin[]> {
   const coins: Coin[] = [];
   const currentTimestamp = Math.floor(Date.now() / 1000);
-  // Обчислюємо нативний баланс
+  // Нативний баланс
   try {
     const nativeRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/balance`, {
       params: { chain },
@@ -148,16 +116,15 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const currentValue = numericBalance * currentPrice;
       const price1hAgo = await getHistoricalPriceCryptoCompare('ETH', currentTimestamp - 3600);
       const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
-      const changeSinceAvgPurchase = "0"; // для нативного активу можна залишити 0
       coins.push({
         symbol: 'ETH',
         balance: ethBalance,
+        avgPurchasePrice: "0",
         currentMarketPrice: currentPrice.toString(),
         currentValue: currentValue.toString(),
-        avgPurchasePrice: "0",
         priceChange1hPercent,
-        changeSinceAvgPurchase,
-        image: nativeImageMapping['eth'] // використання константного URL
+        changeSinceAvgPurchase: "0",
+        image: nativeImageMapping['eth']
       });
     } else if (chain === 'btc') {
       const btcBalance = parseFloat(nativeBalance) / 1e8;
@@ -165,15 +132,14 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const currentValue = btcBalance * currentPrice;
       const price1hAgo = await getHistoricalPriceCryptoCompare('BTC', currentTimestamp - 3600);
       const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
-      const changeSinceAvgPurchase = "0";
       coins.push({
         symbol: 'BTC',
         balance: btcBalance.toString(),
+        avgPurchasePrice: "0",
         currentMarketPrice: currentPrice.toString(),
         currentValue: currentValue.toString(),
-        avgPurchasePrice: "0",
         priceChange1hPercent,
-        changeSinceAvgPurchase,
+        changeSinceAvgPurchase: "0",
         image: nativeImageMapping['btc']
       });
     } else if (chain === 'sol') {
@@ -182,15 +148,14 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const currentValue = solBalance * currentPrice;
       const price1hAgo = await getHistoricalPriceCryptoCompare('SOL', currentTimestamp - 3600);
       const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
-      const changeSinceAvgPurchase = "0";
       coins.push({
         symbol: 'SOL',
         balance: solBalance.toString(),
+        avgPurchasePrice: "0",
         currentMarketPrice: currentPrice.toString(),
         currentValue: currentValue.toString(),
-        avgPurchasePrice: "0",
         priceChange1hPercent,
-        changeSinceAvgPurchase,
+        changeSinceAvgPurchase: "0",
         image: nativeImageMapping['sol']
       });
     } else {
@@ -201,7 +166,7 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
     coins.push({ symbol: chain.toUpperCase(), balance: 'error' });
   }
 
-  // Обчислюємо токени
+  // Токени
   try {
     const tokensRes = await axios.get(`https://deep-index.moralis.io/api/v2/${address}/erc20`, {
       params: { chain },
@@ -217,7 +182,6 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const price1hAgo = await getHistoricalPriceCryptoCompare(token.symbol, currentTimestamp - 3600);
       const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
       const changeSinceAvgPurchase = parseFloat(avgPrice) > 0 ? (((currentPrice - parseFloat(avgPrice)) / parseFloat(avgPrice)) * 100).toString() : "0";
-      // Якщо Moralis повертає поле token_logo, використовуємо його, інакше – порожній рядок.
       const image = token.token_logo || "";
       return {
         symbol: token.symbol,
@@ -245,6 +209,17 @@ export const walletService = {
       callback: import('@grpc/grpc-js').sendUnaryData<GetWalletCoinsResponse>
   ): Promise<void> => {
     try {
+      const portfolioId = call.request.portfolioId; // нове поле, ключ для кешу
+      const cacheKey = `portfolio:${portfolioId}`;
+
+      // Перевіряємо Redis на наявність кешованої відповіді
+      const cachedResponse = await getCachedResponse(cacheKey);
+      if (cachedResponse) {
+        console.log(`Cache hit for portfolio ${portfolioId}`);
+        callback(null, cachedResponse);
+        return;
+      }
+
       const addresses: string[] = call.request.address;
       const results = await Promise.all(
           addresses.map(async (address) => {
@@ -254,14 +229,18 @@ export const walletService = {
           })
       );
       const allCoins = results.flat();
-
-      // Обчислюємо сумарну вартість портфеля (USDT)
       const totalValue = allCoins.reduce((acc, coin) => {
         const val = parseFloat(coin.currentValue || "0");
         return acc + (isNaN(val) ? 0 : val);
       }, 0);
+      const response: GetWalletCoinsResponse = {
+        coins: allCoins,
+        totalPortfolioValueUSDT: totalValue.toString()
+      };
 
-      callback(null, { coins: allCoins, totalPortfolioValueUSDT: totalValue.toString() });
+      await cacheResponse(cacheKey, response);
+
+      callback(null, response);
     } catch (error) {
       console.error("Error in GetWalletCoins:", error);
       callback(error as Error, null);

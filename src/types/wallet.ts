@@ -1,4 +1,5 @@
 export interface GetWalletCoinsRequest {
+  portfolioId: number;
   address: string[];
 }
 
