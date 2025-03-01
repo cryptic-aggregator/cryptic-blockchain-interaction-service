@@ -10,6 +10,7 @@ export interface Coin {
   currentValue?: string;
   priceChange1hPercent? : string,
   changeSinceAvgPurchase? : string,
+  image?: string;
 }
 
 export interface GetWalletCoinsResponse {
