@@ -124,7 +124,8 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
         currentValue: currentValue.toString(),
         priceChange1hPercent,
         changeSinceAvgPurchase: "0",
-        image: nativeImageMapping['eth']
+        image: nativeImageMapping['eth'],
+        name: "Ethereum"
       });
     } else if (chain === 'btc') {
       const btcBalance = parseFloat(nativeBalance) / 1e8;
@@ -156,7 +157,8 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
         currentValue: currentValue.toString(),
         priceChange1hPercent,
         changeSinceAvgPurchase: "0",
-        image: nativeImageMapping['sol']
+        image: nativeImageMapping['sol'],
+        name: "Solana"
       });
     } else {
       coins.push({ symbol: chain.toUpperCase(), balance: nativeBalance.toString() });
@@ -182,7 +184,8 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
       const price1hAgo = await getHistoricalPriceCryptoCompare(token.symbol, currentTimestamp - 3600);
       const priceChange1hPercent = price1hAgo > 0 ? (((currentPrice - price1hAgo) / price1hAgo) * 100).toString() : "0";
       const changeSinceAvgPurchase = parseFloat(avgPrice) > 0 ? (((currentPrice - parseFloat(avgPrice)) / parseFloat(avgPrice)) * 100).toString() : "0";
-      const image = token.token_logo || "";
+      const image = token.logo || "";
+      const name = token.name || "";
       return {
         symbol: token.symbol,
         balance: balance.toString(),
@@ -191,7 +194,8 @@ async function getBalancesForAddress(address: string, chain: string): Promise<Co
         currentValue: currentValue.toString(),
         priceChange1hPercent,
         changeSinceAvgPurchase,
-        image
+        image: image,
+        name: name
       };
     });
     const tokenCoins: Coin[] = await Promise.all(tokenPromises);
