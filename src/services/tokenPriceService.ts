@@ -14,7 +14,6 @@ const CRYPTOCOMPARE_BASE = process.env.CRYPTOCOMPARE_BASE || 'https://min-api.cr
 
 const DELAY_BETWEEN_CALLS_MS = 500;
 
-/** Утиліта для затримки між запитами */
 function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }

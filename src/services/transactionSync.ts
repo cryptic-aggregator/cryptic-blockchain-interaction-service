@@ -21,9 +21,9 @@ import {fetchSolanaTransactions,
 } from './helius';
 
 
-const MORALIS_BASE = process.env.MORALIS_BASE || 'https://api.moralis.io/api/v2';
+const MORALIS_BASE = process.env.MORALIS_BASE;
 const PAGE_LIMIT = 100;
-const MORALIS_API_KEY = process.env.MORALIS_API_KEY || '';
+const MORALIS_API_KEY = process.env.MORALIS_API_KEY;
 
 async function fetchEvmTransactions(
     address: string,
@@ -33,7 +33,6 @@ async function fetchEvmTransactions(
     const all: Transaction[] = [];
     let cursor: string | null = null;
 
-    // обираємо endpoint залежно від мережі
     const getEndpoint = () => {
         switch (chain) {
             case 'sol':
@@ -70,12 +69,17 @@ async function fetchEvmTransactions(
             if (!sinceTs || txTs > sinceTs) {
                 all.push({
                     transactionHash: tx.transaction_hash,
-                    tokenAddress:     // у Solana буде mintAddress
+                    tokenAddress:
                         chain.startsWith('sol')
                             ? tx.mintAddress
                             : tx.token_address,
-                    amount: tx.value,          // у solana.value = amount в lamports
+                    amount: tx.value,
                     ts: txTs,
+                    fromAddress: tx.from_address,
+                    toAddress:   tx.to_address,
+                    token_name: tx.token_name,
+                    symbol: tx.token_symbol,
+                    logo: tx.token_logo,
                     transactionType: tx.from_address?.toLowerCase() === address.toLowerCase() ? 1 : 0,
                 });
             }
