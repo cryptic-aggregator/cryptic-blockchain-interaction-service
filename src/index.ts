@@ -1,12 +1,18 @@
 import * as grpc from '@grpc/grpc-js';
 import { loadProto } from './utils/grpcLoader';
 import { walletService } from './services/walletService';
+import { transactionService } from './services/transactionSync';
+import {tokenPriceService} from "./services/tokenPriceService";
+import dotenv from 'dotenv';
 
-// Load the package based on your proto file
+dotenv.config();
+
 const proto = loadProto('BlockchainIneractionService.proto').cryptic.blockchain_interaction.rpc;
 const server = new grpc.Server();
 
 server.addService(proto.WalletService.service, walletService);
+server.addService(proto.TransactionService.service, transactionService);
+server.addService(proto.TokenPriceService.service, tokenPriceService);
 
 function main(): void {
   const bindAddress = '0.0.0.0:4001';

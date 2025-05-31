@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blockchain-interaction-deployment
+  labels:
+    app: blockchain-interaction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blockchain-interaction
+  template:
+    metadata:
+      labels:
+        app: blockchain-interaction
+    spec:
+      containers:
+        - name: blockchain-interaction
+          image: stasex/cryptic-grpc-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4001
+          env:
+            - name: PORT
+              value: "4001"
+            - name: NODE_ENV
+              value: "development"
+            - name: GRPC_SERVER_ADDRESS
+              value: "0.0.0.0:4001"
+            - name: MORALIS_API_KEY
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjNmODFhZjY0LWNiZjAtNGRmOC1hNDNiLTJlNzliNzA3MDczNyIsIm9yZ0lkIjoiNDA3NTkwIiwidXNlcklkIjoiNDE4ODIwIiwidHlwZUlkIjoiZDY2MGU1MjYtM2VkZC00ZTUzLTg4NDYtZDVhOTBiYWY2ZWQxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MjU3OTY2MTcsImV4cCI6NDg4MTU1NjYxN30.4tDcTjdtjoY7aEzzwJZIlD_mS6LtTCOY6Zxa5O8k694"
+            - name: HELIUS_API_KEY
+              value: "ed346c68-14bf-46ad-a863-5cd646698342"
+            - name: MORALIS_BASE
+              value: "https://deep-index.moralis.io/api/v2"
+            - name: HELIUS_BASE
+              value: "https://api.helius.xyz/v0"
+            - name: CRYPTOCOMPARE_API_KEY
+              value: "2eafccccdf1cc8ebd3a533d8d61736f358d4db2d2f66eab4a732f30b714f5813"
+            - name: CRYPTOCOMPARE_BASE
+              value: "https://min-api.cryptocompare.com/data"
+            - name: REDIS_CONNSTRING
+              value: "redis://redis-service:6379"

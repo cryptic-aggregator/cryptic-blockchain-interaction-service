@@ -5,8 +5,8 @@ import {formatEther} from "ethers";
 import {cacheResponse, getCachedResponse} from "../database/redis/redisClient";
 
 
-const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjNmODFhZjY0LWNiZjAtNGRmOC1hNDNiLTJlNzliNzA3MDczNyIsIm9yZ0lkIjoiNDA3NTkwIiwidXNlcklkIjoiNDE4ODIwIiwidHlwZUlkIjoiZDY2MGU1MjYtM2VkZC00ZTUzLTg4NDYtZDVhOTBiYWY2ZWQxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3MjU3OTY2MTcsImV4cCI6NDg4MTU1NjYxN30.4tDcTjdtjoY7aEzzwJZIlD_mS6LtTCOY6Zxa5O8k694';
-const CRYPTOCOMPARE_API_KEY = '2eafccccdf1cc8ebd3a533d8d61736f358d4db2d2f66eab4a732f30b714f5813';
+const MORALIS_API_KEY = process.env.MORALIS_API_KEY || '';
+const CRYPTOCOMPARE_API_KEY = process.env.CRYPTOCOMPARE_API_KEY || '';
 
 const cryptoCompareMapping: { [symbol: string]: string } = {
   'WETH': 'ETH',

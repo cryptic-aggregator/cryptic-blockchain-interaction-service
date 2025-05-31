@@ -19,3 +19,27 @@ export interface GetWalletCoinsResponse {
   coins: Coin[];
   totalPortfolioValueUSDT?: string;
 }
+
+export interface GetWalletTransactionsRequest {
+  address: string;
+  chain: string;
+  sinceTs: number;
+}
+
+export interface Transaction {
+  transactionHash: string;
+  tokenAddress: string;
+  amount: string;
+  ts: number;
+  transactionType: number;
+  fromAddress?: string;
+  toAddress?: string;
+  chain?: string;
+  symbol?: string;
+  logo?: string;
+  token_name?: string;
+}
+
+export interface GetWalletTransactionsResponse {
+  transactions: Transaction[];
+}
