@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: blockchain-interaction
-          image: stasex/cryptic-grpc-service:latest
+          image: stasex/cryptic-blockchain-interaction-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 4001
