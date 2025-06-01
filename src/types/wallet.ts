@@ -26,6 +26,11 @@ export interface GetWalletTransactionsRequest {
   sinceTs: number;
 }
 
+export interface GetWalletCoinsByAddressRequest {
+  address: string;
+  portfolioId: number;
+}
+
 export interface Transaction {
   transactionHash: string;
   tokenAddress: string;
