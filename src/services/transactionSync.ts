@@ -20,11 +20,9 @@ import {
 import {fetchSolanaTransactions,
 } from './helius';
 
-
 const MORALIS_BASE = process.env.MORALIS_BASE;
 const PAGE_LIMIT = 100;
 const MORALIS_API_KEY = process.env.MORALIS_API_KEY;
-
 async function fetchEvmTransactions(
     address: string,
     chain: string,
@@ -72,7 +70,7 @@ async function fetchEvmTransactions(
                     tokenAddress:
                         chain.startsWith('sol')
                             ? tx.mintAddress
-                            : tx.token_address,
+                            : tx.address,
                     amount: tx.value,
                     ts: txTs,
                     fromAddress: tx.from_address,

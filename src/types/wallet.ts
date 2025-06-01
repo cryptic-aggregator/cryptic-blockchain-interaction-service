@@ -38,6 +38,8 @@ export interface Transaction {
   symbol?: string;
   logo?: string;
   token_name?: string;
+  fee?: string;
+  status?: boolean;
 }
 
 export interface GetWalletTransactionsResponse {
