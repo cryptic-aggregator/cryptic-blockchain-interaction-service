@@ -34,10 +34,10 @@ spec:
             - name: MORALIS_BASE
               value: "https://deep-index.moralis.io/api/v2"
             - name: HELIUS_BASE
-              value: "https://api.helius.xyz/v0"
+              value: "https://api-mainnet.helius-rpc.com/v0"
             - name: CRYPTOCOMPARE_API_KEY
               value: "2eafccccdf1cc8ebd3a533d8d61736f358d4db2d2f66eab4a732f30b714f5813"
             - name: CRYPTOCOMPARE_BASE
               value: "https://min-api.cryptocompare.com/data"
-            - name: REDIS_CONNSTRING
+            - name: REDIS_URL
               value: "redis://redis-service:6379"

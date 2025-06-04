@@ -3,7 +3,7 @@ import axios from 'axios';
 import {Transaction} from '../types/wallet';
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY || 'ed346c68-14bf-46ad-a863-5cd646698342';
-const HELIUS_BASE = process.env.HELIUS_BASE || 'https://api.helius.xyz/v0';
+const HELIUS_BASE = process.env.HELIUS_BASE || 'https://api-mainnet.helius-rpc.com/v0';
 const SOL_DECIMALS = 9;
 
 const MIN_THRESHOLD = 0.001;

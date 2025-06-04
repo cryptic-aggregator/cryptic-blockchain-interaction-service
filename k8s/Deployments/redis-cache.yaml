@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis-deployment
+  labels:
+    app: redis
 spec:
   replicas: 1
   selector:
@@ -18,7 +20,7 @@ spec:
           imagePullPolicy: Always
           ports:
             - name: redis
-              containerPort: 6387
+              containerPort: 6379
             - name: ui
               containerPort: 8001
           volumeMounts:
@@ -40,3 +42,4 @@ spec:
             failureThreshold: 3
       volumes:
         - name: redis-data
+          emptyDir: {}
